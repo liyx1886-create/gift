@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="format-detection" content="telephone=no" />
+<meta name="theme-color" content="#05060e" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>给你的礼物</title>
+
+<!--
+  ============================================================
+   改这里就够了。下面 CONFIG 里四样东西：
+   secret   = 暗号（可以写好几个，任意一个都算对；大小写/空格/标点会自动忽略）
+   hint     = 输错几次后给出的提示
+   letter   = 信的内容，一行一句，按顺序淡入
+   signature= 落款
+  ============================================================
+-->
+
+<style>
+  :root{
+    --bg:#05060e;
+    --gold:#e8c58a;
+    --gold-soft:#c9a97a;
+    --ink:#f2ece1;
+    --dim:rgba(242,236,225,.55);
+    --line:rgba(232,197,138,.28);
+    --card:rgba(16,18,38,.74);
+    --ease:cubic-bezier(.22,.8,.24,1);
+    --safe-b:env(safe-area-inset-bottom,0px);
+    --safe-t:env(safe-area-inset-top,0px);
+  }
+
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  html{-webkit-text-size-adjust:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+    overscroll-behavior:none;
+    overflow:hidden;
+    touch-action:manipulation;
+  }
+
+  /* ---------- 背景 ---------- */
+  #stars{position:fixed; inset:0; width:100%; height:100%; z-index:0; display:block;}
+  .sky-glow{
+    position:fixed; inset:0; z-index:0; pointer-events:none;
+    background:
+      radial-gradient(60dvh 55dvw at 22% 8%,  rgba(108,86,196,.30), transparent 60%),
+      radial-gradient(55dvh 50dvw at 82% 78%, rgba(196,120,150,.18), transparent 62%),
+      radial-gradient(80dvh 80dvw at 50% 120%, rgba(60,72,150,.28), transparent 65%);
+  }
+  .vignette{
+    position:fixed; inset:0; z-index:1; pointer-events:none;
+    background:radial-gradient(120% 90% at 50% 45%, transparent 42%, rgba(0,0,0,.55) 100%);
+  }
+
+  /* ---------- 舞台 ---------- */
+  #app{position:fixed; inset:0; z-index:2;}
+  .stage{
+    position:absolute; inset:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:calc(var(--safe-t) + 24px) 26px calc(var(--safe-b) + 24px);
+    opacity:0; transform:translateY(14px) scale(.99);
+    visibility:hidden;
+    transition:opacity .65s var(--ease), transform .65s var(--ease), visibility 0s linear .65s;
+    pointer-events:none;
+  }
+  .stage.is-active{
+    opacity:1; transform:none; visibility:visible; pointer-events:auto;
+    transition:opacity .65s var(--ease), transform .65s var(--ease), visibility 0s linear 0s;
+  }
+
+  /* ---------- 第一幕：礼物盒 ---------- */
+  #stage-gift{cursor:pointer;}
+  .gift-wrap{display:flex; flex-direction:column; align-items:center; gap:clamp(30px,7dvh,54px);}
+
+  .gift{
+    position:relative; width:clamp(140px,42vw,176px); height:clamp(150px,45vw,190px);
+    animation:float 5.2s ease-in-out infinite;
+  }
+  @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+
+  .halo{
+    position:absolute; left:50%; bottom:-6%; width:170%; height:90%;
+    transform:translateX(-50%);
+    background:radial-gradient(closest-side, rgba(180,160,255,.34), rgba(180,160,255,0) 72%);
+    filter:blur(6px);
+    animation:breathe 5.2s ease-in-out infinite;
+  }
+  @keyframes breathe{0%,100%{opacity:.75}50%{opacity:1}}
+
+  .box-body{
+    position:absolute; left:0; right:0; bottom:0; height:66%;
+    border-radius:10px;
+    background:linear-gradient(158deg,#3b2f74 0%,#4c3d8c 42%,#6a4fa3 78%,#7c5cb4 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.22),
+      inset 0 -12px 24px rgba(0,0,0,.35),
+      0 22px 40px -12px rgba(0,0,0,.7),
+      0 0 50px rgba(150,130,255,.22);
+    transition:transform .9s var(--ease), filter .9s var(--ease);
+    transform-origin:bottom center;
+  }
+  .box-body::after{ /* 竖丝带 */
+    content:""; position:absolute; left:50%; top:0; bottom:0; width:22%;
+    transform:translateX(-50%);
+    background:linear-gradient(180deg,#f6d9a4,#e8b877 55%,#c99551);
+    box-shadow:0 0 14px rgba(240,200,140,.35), inset 0 0 6px rgba(255,255,255,.5);
+  }
+  .box-body::before{ /* 盒面高光 */
+    content:""; position:absolute; inset:0; border-radius:10px;
+    background:linear-gradient(200deg, rgba(255,255,255,.16), transparent 45%);
+    pointer-events:none;
+  }
+
+  .lid{
+    position:absolute; left:-5%; right:-5%; top:22%; height:16%;
+    border-radius:7px;
+    background:linear-gradient(160deg,#4a3a86,#6b53a6 60%,#8767c0);
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.3),
+      0 10px 18px -6px rgba(0,0,0,.65),
+      0 0 26px rgba(150,130,255,.2);
+    transition:transform 1s var(--ease), opacity .9s var(--ease);
+    transform-origin:center;
+  }
+  .lid::after{
+    content:""; position:absolute; left:50%; top:0; bottom:0; width:20%;
+    transform:translateX(-50%);
+    background:linear-gradient(180deg,#ffe6bd,#e8b877 55%,#cf9a55);
+    box-shadow:0 0 12px rgba(240,200,140,.4);
+  }
+
+  .bow{
+    position:absolute; left:50%; top:8%; width:64%; height:26%;
+    transform:translateX(-50%);
+    transition:transform 1s var(--ease), opacity .9s var(--ease);
+  }
+  .bow span{
+    position:absolute; top:38%; width:48%; height:62%;
+    border-radius:60% 40% 55% 45%/65% 65% 35% 35%;
+    background:linear-gradient(140deg,#ffe9c4,#eec387 45%,#c99a5c);
+    box-shadow:inset 0 2px 6px rgba(255,255,255,.55), 0 4px 12px rgba(0,0,0,.4);
+  }
+  .bow span:nth-child(1){left:0; transform:rotate(-16deg);}
+  .bow span:nth-child(2){right:0; transform:rotate(16deg) scaleX(-1);}
+  .bow i{
+    position:absolute; left:50%; top:44%; width:22%; aspect-ratio:1; transform:translate(-50%,-50%);
+    border-radius:50%;
+    background:radial-gradient(circle at 34% 32%,#fff3d8,#e9bd80 55%,#b98b4e);
+    box-shadow:0 2px 8px rgba(0,0,0,.45);
+  }
+
+  /* 拆开 */
+  .gift.opening .lid{transform:translateY(-120%) rotate(-16deg); opacity:0;}
+  .gift.opening .bow{transform:translate(-50%,-190%) rotate(-22deg); opacity:0;}
+  .gift.opening .box-body{transform:scale(.92); filter:brightness(1.35);}
+  .gift.opening{animation:none;}
+
+  .gift-copy{text-align:center; max-width:24em;}
+  .kicker{
+    margin:0 0 14px; font-size:11px; letter-spacing:.34em; text-indent:.34em;
+    color:rgba(232,197,138,.62);
+  }
+  .gift-copy h1{
+    margin:0 0 22px; font-weight:400;
+    font-size:clamp(19px,5.4vw,24px); letter-spacing:.14em;
+    color:var(--ink);
+    text-shadow:0 0 22px rgba(200,180,255,.35);
+  }
+  .tap-hint{
+    display:inline-block; margin:0; padding:10px 20px;
+    font-size:12px; letter-spacing:.24em; text-indent:.24em; color:rgba(240,222,190,.8);
+    border:1px solid rgba(232,197,138,.28); border-radius:999px;
+    background:rgba(232,197,138,.06);
+    animation:pulse 2.6s ease-in-out infinite;
+  }
+  @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+
+  /* ---------- 第二幕：暗号 ---------- */
+  .lock-card{
+    width:100%; max-width:340px;
+    padding:30px 24px 26px;
+    border-radius:22px;
+    background:var(--card);
+    border:1px solid var(--line);
+    backdrop-filter:blur(14px) saturate(120%);
+    -webkit-backdrop-filter:blur(14px) saturate(120%);
+    box-shadow:0 24px 60px -24px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,.06);
+    text-align:center;
+  }
+  .lock-card.shake{animation:shake .42s cubic-bezier(.36,.07,.19,.97);}
+  @keyframes shake{
+    10%,90%{transform:translateX(-2px)} 20%,80%{transform:translateX(4px)}
+    30%,50%,70%{transform:translateX(-7px)} 40%,60%{transform:translateX(7px)}
+  }
+  .lock-title{font-size:17px; letter-spacing:.2em; color:var(--gold); margin:0 0 8px;}
+  .lock-sub{margin:0 0 26px; font-size:12.5px; letter-spacing:.08em; color:var(--dim); line-height:1.7;}
+
+  .field{position:relative; margin-bottom:22px;}
+  #secret{
+    width:100%; padding:8px 4px 10px;
+    background:transparent; border:0; border-bottom:1px solid rgba(232,197,138,.32);
+    color:var(--ink); font-size:18px; /* 16px+ 防止 iOS 自动放大 */
+    letter-spacing:.12em; text-align:center; outline:none;
+    font-family:inherit;
+    border-radius:0;
+    transition:border-color .3s, box-shadow .3s;
+  }
+  #secret::placeholder{color:rgba(242,236,225,.26); letter-spacing:.1em; font-size:15px;}
+  #secret:focus{border-bottom-color:var(--gold); box-shadow:0 2px 0 -1px rgba(232,197,138,.5);}
+
+  .btn{
+    -webkit-appearance:none; appearance:none;
+    width:100%; padding:14px; border-radius:14px; cursor:pointer;
+    font-family:inherit; font-size:15px; letter-spacing:.28em; text-indent:.28em;
+    color:#20180c; font-weight:600;
+    background:linear-gradient(160deg,#f7dfb2,#e3bb7d 58%,#c99a5c);
+    border:0;
+    box-shadow:0 10px 24px -14px rgba(230,190,130,.6), inset 0 1px 0 rgba(255,255,255,.7);
+    transition:transform .18s var(--ease), filter .2s, box-shadow .2s;
+  }
+  .btn:active{transform:scale(.975); filter:brightness(.96);}
+
+  .lock-msg{
+    min-height:20px; margin:14px 0 0; font-size:12.5px; letter-spacing:.06em;
+    color:#f0a9a9; opacity:0; transition:opacity .3s;
+  }
+  .lock-msg.show{opacity:1;}
+
+  .hint-btn{
+    -webkit-appearance:none; appearance:none; background:none; border:0; cursor:pointer;
+    font-family:inherit; font-size:12px; letter-spacing:.1em;
+    color:rgba(232,197,138,.62); padding:10px 6px 8px; margin-top:2px;
+    border-bottom:1px solid rgba(232,197,138,.24);
+  }
+  .hint{
+    margin:6px 0 0; font-size:12.5px; line-height:1.85; letter-spacing:.04em;
+    color:rgba(242,236,225,.72);
+    max-height:0; overflow:hidden; opacity:0;
+    transition:max-height .55s var(--ease), opacity .45s;
+  }
+  .hint.show{max-height:140px; opacity:1;}
+
+  /* ---------- 第三幕：信 ---------- */
+  #stage-letter{justify-content:flex-start; padding-top:calc(var(--safe-t) + 8dvh); padding-bottom:calc(var(--safe-b) + 4dvh);}
+  .paper{
+    width:100%; max-width:380px; max-height:76dvh; overflow-y:auto;
+    padding:34px 26px 28px;
+    border-radius:18px;
+    background:linear-gradient(168deg, rgba(28,26,52,.92), rgba(14,14,30,.95));
+    border:1px solid rgba(232,197,138,.22);
+    box-shadow:0 30px 70px -30px rgba(0,0,0,.95), inset 0 1px 0 rgba(255,255,255,.05);
+    -webkit-overflow-scrolling:touch; overscroll-behavior:contain;
+    opacity:0; transform:translateY(26px);
+    transition:opacity .9s var(--ease), transform 1s var(--ease);
+  }
+  .paper.reveal{opacity:1; transform:none;}
+  .paper::-webkit-scrollbar{width:0;}
+  .paper::before{
+    content:""; display:block; width:34px; height:1px; margin:0 auto 26px;
+    background:linear-gradient(90deg,transparent,var(--gold),transparent);
+  }
+  .line{
+    margin:0 0 17px; font-size:15.5px; line-height:2.05; letter-spacing:.045em;
+    color:rgba(242,236,225,.92);
+    font-family:"Songti SC","STSong","Kaiti SC","KaiTi","Noto Serif SC",Georgia,serif;
+    opacity:0; transform:translateY(12px);
+    transition:opacity .85s var(--ease), transform .85s var(--ease);
+    transition-delay:var(--d,0s);
+  }
+  .paper.reveal .line{opacity:1; transform:none;}
+  .line.em{color:var(--gold);}
+
+  .sign{
+    margin:30px 0 0; text-align:right;
+    font-family:"Kaiti SC","KaiTi","Songti SC",serif;
+    font-size:15px; letter-spacing:.08em; color:var(--gold-soft);
+    opacity:0; transform:translateY(10px);
+    transition:opacity 1s var(--ease) .5s, transform 1s var(--ease) .5s;
+  }
+  .paper.reveal .sign{opacity:1; transform:none;}
+  .sign small{display:block; margin-top:6px; font-size:11px; letter-spacing:.24em; color:rgba(232,197,138,.42);}
+
+  .again{
+    -webkit-appearance:none; appearance:none; background:none; border:0; cursor:pointer;
+    font-family:inherit; margin-top:22px; padding:10px 16px;
+    font-size:11.5px; letter-spacing:.22em; color:rgba(242,236,225,.32);
+  }
+
+  /* ---------- 声音开关 ---------- */
+  .sound{
+    position:fixed; right:16px; top:calc(var(--safe-t) + 14px); z-index:5;
+    width:34px; height:34px; border-radius:50%; cursor:pointer;
+    border:1px solid rgba(232,197,138,.2); background:rgba(255,255,255,.04);
+    color:rgba(232,197,138,.55); font-size:13px; line-height:1;
+    display:grid; place-items:center;
+    transition:opacity .4s, border-color .3s;
+  }
+  .sound.muted{opacity:.35;}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:.001s !important; animation-iteration-count:1 !important; transition-duration:.2s !important;}
+    .gift{animation:none;}
+  }
+
+  /* 横屏 / 矮屏（手机横过来、或者小窗口）时收紧尺寸，别把内容顶出去 */
+  @media (max-height: 560px){
+    .gift{width:clamp(96px,26vw,120px); height:clamp(104px,28vw,132px);}
+    .gift-wrap{gap:16px;}
+    .gift-copy h1{font-size:17px; margin-bottom:12px;}
+    .kicker{margin-bottom:8px;}
+    .tap-hint{padding:8px 16px; font-size:11px;}
+    .lock-card{padding:20px 20px 18px; border-radius:18px;}
+    .lock-title{font-size:15px;}
+    .lock-sub{margin-bottom:16px; font-size:11.5px;}
+    .field{margin-bottom:14px;}
+    #secret{font-size:17px; padding:6px 4px 8px;}
+    .btn{padding:11px; font-size:14px;}
+    .hint-btn{padding:6px 6px;}
+    #stage-letter{padding-top:calc(var(--safe-t) + 14px); padding-bottom:var(--safe-b);}
+    .paper{max-height:82dvh; padding:22px 20px 20px;}
+    .line{font-size:14px; line-height:1.95; margin-bottom:12px;}
+    .sign{margin-top:18px;}
+  }
+</style>
+</head>
+
+<body>
+<canvas id="stars" aria-hidden="true"></canvas>
+<div class="sky-glow" aria-hidden="true"></div>
+<div class="vignette" aria-hidden="true"></div>
+
+<button class="sound" id="sound" type="button" aria-label="声音开关" title="声音开关">♪</button>
+
+<main id="app">
+
+  <!-- 第一幕 -->
+  <section class="stage is-active" id="stage-gift" role="button" tabindex="0" aria-label="拆开礼物">
+    <div class="gift-wrap">
+      <div class="gift" id="gift">
+        <div class="halo"></div>
+        <div class="box-body"></div>
+        <div class="lid"></div>
+        <div class="bow"><span></span><span></span><i></i></div>
+      </div>
+      <div class="gift-copy">
+        <p class="kicker" id="kicker"></p>
+        <h1>有件东西，一直在等今天</h1>
+        <p class="tap-hint">点一下，拆开它</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 第二幕 -->
+  <section class="stage" id="stage-lock">
+    <div class="lock-card" id="lock-card">
+      <p class="lock-title">先对个暗号</p>
+      <p class="lock-sub">是只有我们两个人知道的那句话</p>
+      <form id="lock-form" autocomplete="off" novalidate>
+        <div class="field">
+          <input id="secret" type="text" inputmode="text" enterkeyhint="go"
+                 autocomplete="off" autocorrect="off" autocapitalize="off"
+                 spellcheck="false" placeholder="在下面输入暗号" aria-label="暗号" />
+        </div>
+        <button class="btn" type="submit">打 开</button>
+      </form>
+      <p class="lock-msg" id="lock-msg" role="status" aria-live="polite"></p>
+      <button class="hint-btn" id="hint-btn" type="button">给我一点提示</button>
+      <p class="hint" id="hint"></p>
+    </div>
+  </section>
+
+  <!-- 第三幕 -->
+  <section class="stage" id="stage-letter">
+    <article class="paper" id="paper">
+      <div id="letter-body"></div>
+      <p class="sign" id="sign"></p>
+    </article>
+    <button class="again" id="again" type="button">再拆一次</button>
+  </section>
+
+</main>
+
+<noscript>
+  <p style="position:fixed;inset:0;display:grid;place-items:center;color:#f2ece1;padding:30px;text-align:center;line-height:2;">
+    这封信需要打开 JavaScript 才能拆开。<br />请在浏览器设置里允许后重新打开。
+  </p>
+</noscript>
+
+<script>
+/* ==========================================================
+   ↓↓↓  只改这里  ↓↓↓
+   ========================================================== */
+const CONFIG = {
+
+  // 礼物盒上方那行小字（称呼），留空就不显示
+  to: "TO · 今天过生日的人",
+
+  // 暗号：写几个都行，任意一个都算对。
+  // 比较时会自动忽略大小写、空格、标点和全角半角差异。
+  secret: ["ch"],
+
+  // 输错 3 次会自动给出这句提示；也可以点"给我一点提示"主动看
+  hint: "两个字母。很小声的那种叫法。",
+
+  // 信的内容：一行一句，会按顺序一句一句浮现
+  letter: [
+    "生日快乐。",
+    "认识你以后我才知道，普通的一天也可以变成舍不得过完的一天。",
+    "这一年你扛了很多事，很多没有说出口。我看见了，也都记着。",
+    "所以今天不想讲大道理，只想把这句话好好说给你听——",
+    "你不用一直那么用力，也值得被好好喜欢。",
+    "愿你以后每一年，抬头都有星星，回头都有人在。",
+  ],
+
+  // 落款
+  signature: "—— 生日快乐，我的小朋友",
+  date: "2026 · 冬",
+
+  // 声音：默认开，右上角可以关
+  sound: true,
+};
+/* ==========================================================
+   ↑↑↑  只改这里  ↑↑↑
+   ========================================================== */
+
+
+/* ---------- 工具 ---------- */
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => Array.from(document.querySelectorAll(s));
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function normalize(str) {
+  return (str || "")
+    .normalize("NFKC")            // 全角 → 半角
+    .toLowerCase()
+    .replace(/[\s\u3000]+/g, "")  // 空格
+    .replace(/[，。、！？,.!?~～\-—_·・"'“”‘’()（）\[\]【】:：;；]/g, "");
+}
+
+/* ---------- 星空 ---------- */
+const canvas = $("#stars");
+const ctx = canvas.getContext("2d", { alpha: true });
+let W = 0, H = 0, stars = [], sparks = [], raf = null, lastT = 0, nextShoot = 4;
+
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = Math.floor(W * dpr);
+  canvas.height = Math.floor(H * dpr);
+  canvas.style.width = W + "px";
+  canvas.style.height = H + "px";
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  buildStars();
+}
+
+function buildStars() {
+  const n = Math.max(60, Math.min(240, Math.round((W * H) / 7000)));
+  stars = [];
+  for (let i = 0; i < n; i++) {
+    stars.push({
+      x: Math.random() * W,
+      y: Math.random() * H,
+      r: 0.3 + Math.random() * 1.35,
+      base: 0.25 + Math.random() * 0.6,
+      ph: Math.random() * Math.PI * 2,
+      sp: 0.4 + Math.random() * 1.1,
+      gold: Math.random() < 0.14,
+      dx: (Math.random() - 0.5) * 0.05,
+    });
+  }
+}
+
+function spawnBurst(x, y, count, gold) {
+  for (let i = 0; i < count; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = 1.2 + Math.random() * 5.2;
+    sparks.push({
+      x, y,
+      vx: Math.cos(a) * sp,
+      vy: Math.sin(a) * sp - 1.4,
+      life: 1,
+      decay: 0.008 + Math.random() * 0.016,
+      r: 0.7 + Math.random() * 2.1,
+      gold: gold || Math.random() < 0.5,
+    });
+  }
+}
+
+function spawnRise(x, y) {
+  for (let i = 0; i < 26; i++) {
+    sparks.push({
+      x: x + (Math.random() - 0.5) * 90,
+      y: y + Math.random() * 40,
+      vx: (Math.random() - 0.5) * 0.5,
+      vy: -0.45 - Math.random() * 1.1,
+      life: 1,
+      decay: 0.004 + Math.random() * 0.006,
+      r: 0.6 + Math.random() * 1.7,
+      gold: true,
+    });
+  }
+}
+
+function draw(t) {
+  const dt = Math.min(48, t - lastT) || 16;
+  lastT = t;
+  const f = dt / 16.67;
+
+  ctx.clearRect(0, 0, W, H);
+
+  for (const s of stars) {
+    s.ph += 0.012 * s.sp * f;
+    if (!reduceMotion) {
+      s.x += s.dx * f;
+      if (s.x < -2) s.x = W + 2;
+      if (s.x > W + 2) s.x = -2;
+    }
+    const tw = s.base + Math.sin(s.ph) * 0.42;
+    const a = Math.max(0.04, Math.min(1, tw));
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = s.gold
+      ? "rgba(240,214,166," + a + ")"
+      : "rgba(216,222,255," + a + ")";
+    ctx.fill();
+    if (s.r > 1.15) {
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r * 3.4, 0, Math.PI * 2);
+      ctx.fillStyle = s.gold
+        ? "rgba(240,214,166," + a * 0.055 + ")"
+        : "rgba(200,210,255," + a * 0.05 + ")";
+      ctx.fill();
+    }
+  }
+
+  // 流星
+  if (!reduceMotion) {
+    nextShoot -= dt / 1000;
+    if (nextShoot <= 0) {
+      nextShoot = 7 + Math.random() * 9;
+      const sx = Math.random() * W * 0.7 + W * 0.1;
+      sparks.push({ x: sx, y: -10, vx: 5.2, vy: 7.4, life: 1, decay: 0.0065, r: 1.5, gold: true, shoot: true });
+    }
+  }
+
+  for (let i = sparks.length - 1; i >= 0; i--) {
+    const p = sparks[i];
+    p.x += p.vx * f;
+    p.y += p.vy * f;
+    if (!p.shoot) p.vy += 0.055 * f;
+    p.vx *= 0.994;
+    p.vy *= 0.994;
+    p.life -= p.decay * f * 1.6;
+    if (p.life <= 0) { sparks.splice(i, 1); continue; }
+    const a = Math.max(0, Math.min(1, p.life));
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r * (0.5 + a * 0.9), 0, Math.PI * 2);
+    ctx.fillStyle = p.gold
+      ? "rgba(246,222,174," + a + ")"
+      : "rgba(214,220,255," + a + ")";
+    ctx.fill();
+    if (p.shoot) {
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x - p.vx * 8, p.y - p.vy * 8);
+      ctx.strokeStyle = "rgba(246,222,174," + a * 0.55 + ")";
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
+  }
+
+  raf = requestAnimationFrame(draw);
+}
+
+function startSky() {
+  if (raf) return;
+  lastT = 0;
+  raf = requestAnimationFrame(draw);
+}
+function stopSky() {
+  if (raf) { cancelAnimationFrame(raf); raf = null; }
+}
+
+window.addEventListener("resize", () => { resize(); });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) stopSky(); else startSky();
+});
+
+/* ---------- 声音 ---------- */
+let ac = null;
+let soundOn = !!CONFIG.sound;
+const soundBtn = $("#sound");
+
+function audio() {
+  if (!soundOn) return null;
+  if (!ac) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    ac = new AC();
+  }
+  if (ac.state === "suspended") ac.resume();
+  return ac;
+}
+
+function tone(freq, start, dur, gain) {
+  const a = audio();
+  if (!a) return;
+  const t0 = a.currentTime + start;
+  const o = a.createOscillator();
+  const g = a.createGain();
+  o.type = "sine";
+  o.frequency.value = freq;
+  g.gain.setValueAtTime(0, t0);
+  g.gain.linearRampToValueAtTime(gain, t0 + 0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g).connect(a.destination);
+  o.start(t0);
+  o.stop(t0 + dur + 0.05);
+}
+
+function sfxOpen() {
+  tone(392, 0, 0.5, 0.05);
+  tone(587.33, 0.07, 0.55, 0.04);
+}
+
+function sfxUnlock() {
+  [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, i * 0.11, 0.7, 0.045));
+}
+
+function sfxWrong() {
+  tone(196, 0, 0.22, 0.045);
+  tone(185, 0.06, 0.24, 0.035);
+}
+
+soundBtn.addEventListener("click", () => {
+  soundOn = !soundOn;
+  soundBtn.classList.toggle("muted", !soundOn);
+  if (soundOn) sfxOpen();
+});
+
+/* ---------- 换幕 ---------- */
+function showStage(id) {
+  $$(".stage").forEach((s) => {
+    s.classList.toggle("is-active", s.id === id);
+  });
+}
+
+/* ---------- 第一幕：拆 ---------- */
+const giftStage = $("#stage-gift");
+const gift = $("#gift");
+let opened = false;
+
+function openGift() {
+  if (opened) return;
+  opened = true;
+  sfxOpen();
+  if (navigator.vibrate) navigator.vibrate(12);
+
+  const r = gift.getBoundingClientRect();
+  spawnBurst(r.left + r.width / 2, r.top + r.height * 0.42, 46, false);
+  setTimeout(() => {
+    const r2 = gift.getBoundingClientRect();
+    spawnBurst(r2.left + r2.width / 2, r2.top + r2.height * 0.45, 30, true);
+  }, 180);
+
+  gift.classList.add("opening");
+  giftStage.classList.remove("is-active");
+
+  setTimeout(() => {
+    showStage("stage-lock");
+    const input = $("#secret");
+    setTimeout(() => input.focus({ preventScroll: true }), 420);
+  }, 620);
+}
+
+giftStage.addEventListener("click", openGift);
+giftStage.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openGift(); }
+});
+
+/* ---------- 第二幕：暗号 ---------- */
+const form = $("#lock-form");
+const input = $("#secret");
+const msg = $("#lock-msg");
+const hintEl = $("#hint");
+const hintBtn = $("#hint-btn");
+const lockCard = $("#lock-card");
+
+hintEl.textContent = CONFIG.hint || "";
+let wrongCount = 0;
+let unlocked = false;
+
+const wrongWords = ["暗号不对哦，再想想", "差一点点", "不是这一句呢"];
+
+function showMsg(text) {
+  msg.textContent = text;
+  msg.classList.add("show");
+  clearTimeout(showMsg.t);
+  showMsg.t = setTimeout(() => msg.classList.remove("show"), 2600);
+}
+
+function revealHint() {
+  hintEl.classList.add("show");
+  hintBtn.style.display = "none";
+}
+
+hintBtn.addEventListener("click", revealHint);
+
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
+  if (unlocked) return;
+
+  const val = normalize(input.value);
+  if (!val) {
+    lockCard.classList.add("shake");
+    setTimeout(() => lockCard.classList.remove("shake"), 460);
+    showMsg("先把暗号写进来");
+    return;
+  }
+
+  const ok = (CONFIG.secret || []).some((s) => normalize(s) === val);
+
+  if (ok) {
+    unlocked = true;
+    sfxUnlock();
+    if (navigator.vibrate) navigator.vibrate([10, 60, 18]);
+    input.blur();
+    const r = lockCard.getBoundingClientRect();
+    spawnBurst(r.left + r.width / 2, r.top + r.height * 0.3, 40, true);
+    showStage("stage-letter");
+    setTimeout(() => {
+      $("#paper").classList.add("reveal");
+      spawnRise(W / 2, H * 0.78);
+    }, 320);
+    setTimeout(() => spawnRise(W / 2, H * 0.72), 1400);
+  } else {
+    wrongCount++;
+    sfxWrong();
+    lockCard.classList.add("shake");
+    setTimeout(() => lockCard.classList.remove("shake"), 460);
+    showMsg(wrongWords[(wrongCount - 1) % wrongWords.length] + (wrongCount >= 3 ? "" : "（再试试）"));
+    if (wrongCount >= 3) {
+      setTimeout(revealHint, 380);
+      const r = lockCard.getBoundingClientRect();
+      spawnBurst(r.left + r.width / 2, r.top + 30, 14, false);
+    }
+    input.select();
+  }
+});
+
+/* ---------- 第三幕：信 ---------- */
+function buildLetter() {
+  const body = $("#letter-body");
+  body.innerHTML = "";
+  (CONFIG.letter || []).forEach((text, i) => {
+    const p = document.createElement("p");
+    p.className = "line" + (i === 0 ? " em" : "");
+    p.style.setProperty("--d", (0.15 + i * 0.55).toFixed(2) + "s");
+    p.textContent = text;
+    body.appendChild(p);
+  });
+  const sign = $("#sign");
+  sign.innerHTML = "";
+  sign.appendChild(document.createTextNode(CONFIG.signature || ""));
+  if (CONFIG.date) {
+    const small = document.createElement("small");
+    small.textContent = CONFIG.date;
+    sign.appendChild(small);
+  }
+}
+
+/* ---------- 再拆一次 ---------- */
+$("#again").addEventListener("click", () => {
+  $("#paper").classList.remove("reveal");
+  unlocked = false;
+  opened = false;
+  wrongCount = 0;
+  input.value = "";
+  hintEl.classList.remove("show");
+  hintBtn.style.display = "";
+  gift.classList.remove("opening");
+  showStage("stage-gift");
+  setTimeout(() => { $("#paper").classList.remove("reveal"); }, 400);
+  setTimeout(() => $(".paper").scrollTop = 0, 500);
+});
+
+/* ---------- 启动 ---------- */
+buildLetter();
+$("#kicker").textContent = CONFIG.to || "";
+if (!CONFIG.to) $("#kicker").style.display = "none";
+resize();
+startSky();
+
+// 页面加载时来一点点欢迎礼花
+setTimeout(() => {
+  const r = gift.getBoundingClientRect();
+  spawnBurst(r.left + r.width / 2, r.top + r.height * 0.5, 16, false);
+}, 900);
+</script>
+</body>
+</html>
